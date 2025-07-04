@@ -70,6 +70,47 @@ const dataAwal: Product[] = [
   },
 ];
 
+// Komponen CurrencyInput untuk input harga dengan format ribuan, prefix 'Rp', dan 2 desimal
+function CurrencyInput({ value, onChange, ...props }: any) {
+  const [displayValue, setDisplayValue] = useState(value || "");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setDisplayValue(formatValue(value));
+  }, [value]);
+
+  function formatValue(val: string) {
+    if (!val) return "";
+    let clean = val.replace(/[^0-9]/g, "");
+    if (!clean) return "";
+    let num = parseInt(clean, 10) / 100;
+    if (isNaN(num)) return "";
+    return num.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    let raw = e.target.value.replace(/[^0-9]/g, "");
+    let num = parseInt(raw, 10) || 0;
+    let formatted = (num / 100).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    setDisplayValue(formatted);
+    onChange((num / 100).toFixed(2)); // kirim string angka dengan dua desimal ke parent
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-gray-500">Rp</span>
+      <Input
+        {...props}
+        ref={inputRef}
+        value={displayValue}
+        onChange={handleChange}
+        inputMode="numeric"
+        className="pl-2"
+      />
+    </div>
+  );
+}
+
 export default function Home() {
   // Use State untuk Produk
   const [products, setProducts] = useState<Product[]>(dataAwal);
@@ -93,7 +134,9 @@ export default function Home() {
 
   // Filter & sort
   const filteredProducts = useMemo(() => {
-    let data = products.filter((p) => p.nama.toLowerCase().includes(debouncedSearch.toLowerCase()));
+    let data = products.filter((p) =>
+      p.nama.toLowerCase().includes(debouncedSearch.toLowerCase())
+    );
     if (sort === "price-asc")
       data = [...data].sort((a, b) => a.harga - b.harga);
     if (sort === "price-desc")
@@ -125,7 +168,13 @@ export default function Home() {
     return !products.some(
       (p) => p.nama.toLowerCase() === nama.toLowerCase() && p.id !== id
     );
-  }
+  };
+
+  const currencyFormatter = new Intl.NumberFormat(window.navigator.language, {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 2,
+  });
 
   // Submit form dan Validasi
   const onSubmit = (data: { nama: string; harga: string; stok: string }) => {
@@ -136,13 +185,16 @@ export default function Home() {
     }
 
     // jika harga dibawah 0 atau minus
-    if (+data.harga <= 0) {
+    const hargaNumber = parseFloat(data.harga.replace(/[^0-9.,]/g, "").replace(",", "."));
+    if (hargaNumber <= 0 || isNaN(hargaNumber)) {
       form.setError("harga", { message: "Harga tidak boleh 0" });
       return;
     }
     // jika stok dibawah 0 atau minus
-    if (+data.stok <= 0) {
-      form.setError("stok", { message: "Stok tidak boleh minus" });
+    if (+data.stok < 10) {
+      form.setError("stok", {
+        message: "Stok tidak boleh minus atau dibawah 10",
+      });
       return;
     }
     // Jika semua validasi lolos, simpan produk
@@ -150,7 +202,7 @@ export default function Home() {
       setProducts((prev) =>
         prev.map((p) =>
           p.id === editProduct.id
-            ? { ...p, nama: data.nama, harga: +data.harga, stok: +data.stok }
+            ? { ...p, nama: data.nama, harga: hargaNumber, stok: +data.stok }
             : p
         )
       );
@@ -160,14 +212,15 @@ export default function Home() {
         {
           id: idRef.current++,
           nama: data.nama,
-          harga: +data.harga,
+          harga: hargaNumber,
           stok: +data.stok,
         },
       ]);
     }
     setShowForm(false);
     setEditProduct(null);
-  }
+    form.reset({ nama: "", harga: "", stok: "" });
+  };
 
   // Hapus produk
   function handleDelete() {
@@ -183,7 +236,7 @@ export default function Home() {
           placeholder="Cari produk..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-xs"
+          className="max-w-xs hidden md:block"
         />
         <Select onValueChange={setSort} value={sort}>
           <SelectTrigger className="w-48">
@@ -214,15 +267,18 @@ export default function Home() {
           {filteredProducts.map((p) => (
             <Card key={p.id} className="relative">
               <CardContent className="pt-4 pb-2">
-                <div className="text-xs text-gray-400 mb-2">
-                  Stok: {p.stok}
+                <div className="text-xs text-gray-400 mb-2">Stok: {p.stok}</div>
+                <img
+                  src="https://placehold.co/600x400/EEE/31343C"
+                  alt="gambar"
+                />
+                <div className="font-bold text-center text-lg mb-1">
+                  {p.nama}
                 </div>
-              <img src="https://placehold.co/600x400/EEE/31343C" alt="gambar" />
-                <div className="font-bold text-center text-lg mb-1">{p.nama}</div>
                 <div className="text-sm font-bold text-center mb-1">
-                  Rp{p.harga.toLocaleString()}
+                  Rp{p.harga.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
-                
+
                 <div className="flex gap-2 mt-2 items-center justify-center">
                   <Button
                     size="sm"
@@ -277,7 +333,7 @@ export default function Home() {
                   <FormItem>
                     <FormLabel>Harga</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <CurrencyInput {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -290,7 +346,7 @@ export default function Home() {
                   <FormItem>
                     <FormLabel>Stok</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input type="number" min={10} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

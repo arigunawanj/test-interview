@@ -60,6 +60,7 @@ export default function PokemonPage() {
         <div className="text-red-500">{error}</div>
       ) : (
         <div className="flex flex-col-reverse md:flex-row gap-10">
+          {/* <p>Jumlah Ability: {filtered.length}</p> */}
           <div className="mb-6 w-full md:w-1/2" >
             <Table>
               <TableHeader>
