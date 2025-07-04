@@ -1,103 +1,332 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogFooter,
+} from "@/components/ui/alert-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
+import { useForm } from "react-hook-form";
+
+type Product = {
+  id: number;
+  nama: string;
+  harga: number;
+  stok: number;
+};
+
+const dataAwal: Product[] = [
+  {
+    id: 1,
+    nama: "Minuman Botol",
+    harga: 5000,
+    stok: 5,
+  },
+  {
+    id: 2,
+    nama: "Makanan Ringan",
+    harga: 1000,
+    stok: 10,
+  },
+  {
+    id: 3,
+    nama: "Tisu Basah",
+    harga: 7000,
+    stok: 2,
+  },
+  {
+    id: 4,
+    nama: "Kaca Pembersih",
+    harga: 16000,
+    stok: 7,
+  },
+];
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  // Use State untuk Produk
+  const [products, setProducts] = useState<Product[]>(dataAwal);
+  const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [deleteProduct, setDeleteProduct] = useState<Product | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  // Filter, Sort dan Debouce search
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<string>("default");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // State Loading dan Show Form
+  const [showForm, setShowForm] = useState(false);
+  const idRef = useRef(dataAwal.length + 1);
+
+  // Fitur Debounce dengan delay 300ms
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  // Filter & sort
+  const filteredProducts = useMemo(() => {
+    let data = products.filter((p) => p.nama.toLowerCase().includes(debouncedSearch.toLowerCase()));
+    if (sort === "price-asc")
+      data = [...data].sort((a, b) => a.harga - b.harga);
+    if (sort === "price-desc")
+      data = [...data].sort((a, b) => b.harga - a.harga);
+    if (sort === "stock-asc") data = [...data].sort((a, b) => a.stok - b.stok);
+    if (sort === "stock-desc") data = [...data].sort((a, b) => b.stok - a.stok);
+    return data;
+  }, [products, debouncedSearch, sort]);
+
+  // Form awal
+  const form = useForm({
+    defaultValues: { nama: "", harga: "", stok: "" },
+  });
+
+  useEffect(() => {
+    if (editProduct) {
+      form.reset({
+        nama: editProduct.nama,
+        harga: editProduct.harga.toString(),
+        stok: editProduct.stok.toString(),
+      });
+    } else {
+      form.reset({ nama: "", harga: "", stok: "" });
+    }
+  }, [editProduct, form]);
+
+  // Validasi nama yang sudahada
+  const isNameUnique = (nama: string, id: number | null = null) => {
+    return !products.some(
+      (p) => p.nama.toLowerCase() === nama.toLowerCase() && p.id !== id
+    );
+  }
+
+  // Submit form dan Validasi
+  const onSubmit = (data: { nama: string; harga: string; stok: string }) => {
+    // Jika namanya sudah terdaftar
+    if (!isNameUnique(data.nama, editProduct?.id ?? null)) {
+      form.setError("nama", { message: "Nama produk sudah terdaftar" });
+      return;
+    }
+
+    // jika harga dibawah 0 atau minus
+    if (+data.harga <= 0) {
+      form.setError("harga", { message: "Harga tidak boleh 0" });
+      return;
+    }
+    // jika stok dibawah 0 atau minus
+    if (+data.stok <= 0) {
+      form.setError("stok", { message: "Stok tidak boleh minus" });
+      return;
+    }
+    // Jika semua validasi lolos, simpan produk
+    if (editProduct) {
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === editProduct.id
+            ? { ...p, nama: data.nama, harga: +data.harga, stok: +data.stok }
+            : p
+        )
+      );
+    } else {
+      setProducts((prev) => [
+        ...prev,
+        {
+          id: idRef.current++,
+          nama: data.nama,
+          harga: +data.harga,
+          stok: +data.stok,
+        },
+      ]);
+    }
+    setShowForm(false);
+    setEditProduct(null);
+  }
+
+  // Hapus produk
+  function handleDelete() {
+    if (!deleteProduct) return;
+    setProducts((prev) => prev.filter((p) => p.id !== deleteProduct.id));
+    setDeleteProduct(null);
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <div className="flex flex-col md:flex-row md:items-center gap-2 mb-4">
+        <Input
+          placeholder="Cari produk..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
+        <Select onValueChange={setSort} value={sort}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Urutkan" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="default">Default</SelectItem>
+            <SelectItem value="price-asc">Harga Termurah</SelectItem>
+            <SelectItem value="price-desc">Harga Termahal</SelectItem>
+            <SelectItem value="stock-asc">Stok Terendah</SelectItem>
+            <SelectItem value="stock-desc">Stok Tertinggi</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          onClick={() => {
+            setShowForm(true);
+            setEditProduct(null);
+          }}
+          className="ml-auto"
+        >
+          Tambah Produk
+        </Button>
+      </div>
+      {filteredProducts.length === 0 ? (
+        <div className="text-center py-10 text-gray-500">Tidak ada produk.</div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filteredProducts.map((p) => (
+            <Card key={p.id} className="relative">
+              <CardContent className="pt-4 pb-2">
+                <div className="text-xs text-gray-400 mb-2">
+                  Stok: {p.stok}
+                </div>
+              <img src="https://placehold.co/600x400/EEE/31343C" alt="gambar" />
+                <div className="font-bold text-center text-lg mb-1">{p.nama}</div>
+                <div className="text-sm font-bold text-center mb-1">
+                  Rp{p.harga.toLocaleString()}
+                </div>
+                
+                <div className="flex gap-2 mt-2 items-center justify-center">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setShowForm(true);
+                      setEditProduct(p);
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setDeleteProduct(p)}
+                  >
+                    Hapus
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      )}
+      {/* Modal Form Tambah/Edit */}
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editProduct ? "Edit Produk" : "Tambah Produk"}
+            </DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="nama"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nama Produk</FormLabel>
+                    <FormControl>
+                      <Input {...field} autoFocus />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="harga"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Harga</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="stok"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stok</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="submit">
+                  {editProduct ? "Simpan" : "Tambah"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      {/* Modal Konfirmasi Hapus */}
+      <AlertDialog
+        open={!!deleteProduct}
+        onOpenChange={() => setDeleteProduct(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Produk?</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div>
+            Yakin ingin menghapus produk <b>{deleteProduct?.nama}</b>?
+          </div>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setDeleteProduct(null)}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Hapus
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
